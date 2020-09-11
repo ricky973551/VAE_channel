@@ -198,8 +198,8 @@ elif device == 'cpu':
 print('debug')
 
 obs_dim = 128
-latent_dim = 32  # Size of the latent variable z
-hidden_dim = 80  # Size of the hidden layer in the encoder / decoder
+latent_dim = 16  # Size of the latent variable z
+hidden_dim = 64  # Size of the hidden layer in the encoder / decoder
 
 # dataset = datasets.MNIST
 # if device == 'cuda':
