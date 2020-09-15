@@ -52,6 +52,8 @@ def get_data_set():
     scaler = sp.MinMaxScaler(feature_range=[-1, 1])
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.fit_transform(X_test)
+    # X_train_scaled = X_train
+    # X_test_scaled = X_test
 
     del LOS_1, LOS_2, NLOS_1, NLOS_2, X_train, X_test
 

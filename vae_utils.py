@@ -50,7 +50,7 @@ def visualize_vae_samples(samples):
     tsne_s = TSNE(init='pca')
     emb_s = tsne_s.fit_transform(samples)
     plt.figure(figsize=[10, 7])
-    plt.scatter(emb_s[:, 0], emb_s[:, 1], alpha=1, marker='X', s=5)
+    plt.scatter(emb_s[:, 0], emb_s[:, 1], alpha=1, marker='X', s=10)
 
 
 def visualize_embeddings(vae, x, y):
