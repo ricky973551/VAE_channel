@@ -34,13 +34,12 @@ elif device == 'cpu':
         batch_size=1000, shuffle=True,
     )
 
-obs_dim = 128  # MNIST images are of shape [1, 28, 28]
+obs_dim = 128
 
 x, y = next(iter(test_loader))
-x = x.view(x.shape[0], obs_dim).to(device)
 
 sns.set_style('whitegrid')
-tsne = TSNE(init='pca')
+tsne = TSNE(init='pca', perplexity=50)
 # Dimensionality reduction on the embeddings using t-SNE
 emb = tsne.fit_transform(x)
 
@@ -49,7 +48,7 @@ labels = y.cpu().numpy()
 for i in np.unique(labels):
     class_ind = np.where(labels == i)
     plt.scatter(emb[class_ind, 0], emb[class_ind, 1], label=f'{i}', alpha=0.5)
-    plt.legend()
+    #plt.legend()
 plt.xlabel('t-SNE component 1')
 plt.ylabel('t-SNE component 2')
 plt.show()

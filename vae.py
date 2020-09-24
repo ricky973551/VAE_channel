@@ -52,7 +52,7 @@ class VAE(nn.Module):
 
         h_relu = torch.relu(self.linear1(x))
         mu = self.linear21(h_relu)
-        logsigma = torch.sigmoid(self.linear22(h_relu))
+        logsigma = -torch.relu(self.linear22(h_relu))
 
         return mu, logsigma
 
@@ -94,8 +94,8 @@ class VAE(nn.Module):
         ##########################################################
         # YOUR CODE HERE
         h_relu = torch.relu(self.linear3(z))
-        theta = torch.tanh(self.linear41(h_relu))
-        logsigma_d = torch.tanh(self.linear42(h_relu))
+        theta = self.linear41(h_relu)
+        logsigma_d = -torch.relu(self.linear42(h_relu))
 
         return theta, logsigma_d
 
@@ -149,7 +149,7 @@ class VAE(nn.Module):
             dim=1,
         )
 
-        return log_px_ifz, kl, mu, logsigma
+        return log_px_ifz, kl, mu, logsigma, theta
 
         ##########################################################
 
@@ -163,17 +163,38 @@ class VAE(nn.Module):
         """
         ##########################################################
         # YOUR CODE HERE
-        zp = torch.normal(0, 1, size=(num_samples, latent_dim))
+        zp = torch.normal(0, 2, size=(num_samples, latent_dim))
         theta, logsigma_d = self.decoder(zp)
+        # print(logsigma_d)
+        # print(theta)
         samples = self.sample_with_reparam(theta, logsigma_d)
 
         return samples
 
         ##########################################################
 
+    def elbo_with_filter(self, x):
+        """Only to be used in eval mode!
+        Used to calculate the ELBO of generated channels.
+        If ELBO is to low i.e. the ELBO is not maximized for that specific channel
+        it will be discarded (filtered out).
+
+        Args:
+            x: Mini-batch of the observations, shape [batch_size, obs_dim]
+
+        Returns:
+            elbo_mc: MC estimate of ELBO for each sample in the mini-batch, shape [batch_size]
+
+        """
+        ##########################################################
+
+
+
+
+
 device = 'cuda'
 device = 'cpu'  # uncomment this line to run the model on the CPU
-batch_size = 1000
+batch_size = 100
 
 train_data_set, test_data_set, param_data_set = dataset_init.get_data_set()
 
@@ -233,9 +254,11 @@ hidden_dim = 64  # Size of the hidden layer in the encoder / decoder
 vae = VAE(obs_dim, latent_dim, hidden_dim).to(device)
 opt = torch.optim.Adam(vae.parameters(), lr=1e-5)
 
-max_epochs = 50
+max_epochs = 100
 display_step = 100
 annealing = 0.0
+constant = 5.0
+n_gen_samples = 500
 # init list for losses
 loss_hist = []
 recon_loss_hist = []
@@ -249,8 +272,8 @@ for epoch in range(max_epochs):
         opt.zero_grad()
         # We want to maximize the ELBO, so we minimize the negative ELBO
 
-        recon_loss, kld, mu, logsigma = vae.elbo(x)
-        loss = recon_loss - (annealing * kld)
+        recon_loss, kld, mu, logsigma, theta = vae.elbo(x)
+        loss = recon_loss - annealing * (kld - constant)  # actual calculation of ELBO aka loss
         loss = -loss.mean(-1)
         loss.backward()
         opt.step()
@@ -269,7 +292,6 @@ for epoch in range(max_epochs):
     print(f'  neg reconstruction error = {-recon_loss.item():.4f}')
     print(f'  kl divergence = {kld.item():.4f}')
 
-x, y = next(iter(test_loader))
 fig = plt.figure(figsize=(10, 10))
 fig.suptitle('Loss', fontsize=16)
 ax = fig.add_subplot(111)
@@ -278,9 +300,41 @@ plt.plot(range(max_epochs), recon_loss_hist, 'g', label='Reconstruction Loss')
 plt.plot(range(max_epochs), kld_hist, 'r', label='KL Divergence')
 plt.legend()
 
+# load new channels from TEST data set
+x, y = next(iter(test_loader))
+
+# Visualize Latent Space Embeddings
 vae_utils.visualize_embeddings(vae, x, y)
 
-x_sample = vae.sample(1000, mu, logsigma).detach().cpu().numpy()
-vae_utils.visualize_vae_samples(x_sample)
+vae.eval()
+
+with torch.no_grad():
+    # Generation of Channels
+    x_sample = vae.sample(n_gen_samples, mu, logsigma).detach().cpu()
+    y_sample = 8 * np.ones((n_gen_samples, 1), dtype=int)
+
+    # vae_utils.visualize_vae_samples(x_sample)
+
+    # Reconstruction of Input
+    x_recon = vae.elbo(x)[4]
+    y_recon = y + 4
+
+    # Reconstruction + Filtering of Generated samples
+    condition = loss.item() * 0.9
+    srecon_loss = vae.elbo(x_sample)[0]  # s for sample
+    skl = vae.elbo(x_sample)[1]
+    x_rsample = vae.elbo(x_sample)[4]
+    elbo_s = srecon_loss - skl
+    idx = torch.where(-elbo_s > condition)
+    print(idx[0])
+
+    # only select indices that fulfil condition
+    x_fsample = x_rsample[idx[0], :]
+    n_fsamples = x_fsample.shape[0]
+    y_fsample = 8 * np.ones((n_fsamples, 1), dtype=int)
+
+    # Plotting everything together in same TSNE environment
+    vae_utils.visualize_all(vae, x, y, x_recon, y_recon, x_fsample.numpy(), y_fsample)
+
 
 plt.show()
