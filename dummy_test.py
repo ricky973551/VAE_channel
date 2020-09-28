@@ -10,7 +10,7 @@ from sklearn.manifold import TSNE
 
 device = 'cuda'
 device = 'cpu'  # uncomment this line to run the model on the CPU
-batch_size = 200
+batch_size = 10000
 # dataset = datasets.MNIST
 
 train_data_set, test_data_set, param_data_set = dataset_init.get_data_set()
@@ -36,10 +36,10 @@ elif device == 'cpu':
 
 obs_dim = 128
 
-x, y = next(iter(test_loader))
+x, y = next(iter(train_loader))
 
 sns.set_style('whitegrid')
-tsne = TSNE(init='pca', perplexity=50)
+tsne = TSNE(init='pca')
 # Dimensionality reduction on the embeddings using t-SNE
 emb = tsne.fit_transform(x)
 

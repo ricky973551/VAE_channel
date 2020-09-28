@@ -214,7 +214,7 @@ elif device == 'cpu':
     )
     test_loader = torch.utils.data.DataLoader(
         test_data_set,
-        batch_size=1000, shuffle=True,
+        batch_size=2000, shuffle=True,
     )
 
 print('debug')
@@ -258,7 +258,8 @@ max_epochs = 100
 display_step = 100
 annealing = 0.0
 constant = 5.0
-n_gen_samples = 500
+n_gen_samples = 1000
+percent_threshold = 0.9
 # init list for losses
 loss_hist = []
 recon_loss_hist = []
@@ -309,23 +310,24 @@ vae_utils.visualize_embeddings(vae, x, y)
 vae.eval()
 
 with torch.no_grad():
+    # Dummy visualization of samples
+    vae_utils.visualize_dummy_samples(x, y)
+
     # Generation of Channels
     x_sample = vae.sample(n_gen_samples, mu, logsigma).detach().cpu()
     y_sample = 8 * np.ones((n_gen_samples, 1), dtype=int)
-
-    # vae_utils.visualize_vae_samples(x_sample)
 
     # Reconstruction of Input
     x_recon = vae.elbo(x)[4]
     y_recon = y + 4
 
     # Reconstruction + Filtering of Generated samples
-    condition = loss.item() * 0.9
+    condition = - loss.item() * (1 / percent_threshold)
     srecon_loss = vae.elbo(x_sample)[0]  # s for sample
     skl = vae.elbo(x_sample)[1]
     x_rsample = vae.elbo(x_sample)[4]
     elbo_s = srecon_loss - skl
-    idx = torch.where(-elbo_s > condition)
+    idx = torch.where(elbo_s > condition)
     print(idx[0])
 
     # only select indices that fulfil condition
@@ -334,7 +336,10 @@ with torch.no_grad():
     y_fsample = 8 * np.ones((n_fsamples, 1), dtype=int)
 
     # Plotting everything together in same TSNE environment
-    vae_utils.visualize_all(vae, x, y, x_recon, y_recon, x_fsample.numpy(), y_fsample)
+    vae_utils.visualize_all(x, y, x_recon, y_recon, x_fsample.numpy(), y_fsample)
+
+    # Plotting generated filtered samples and original
+    vae_utils.visualize_vae_samples(x, y, x_fsample.numpy(), y_fsample)
 
 
 plt.show()
